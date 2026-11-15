@@ -4,6 +4,7 @@ import cors from "cors";
 import connectDB from "./config/db.js";
 import authRoutes from "./routes/auth.js";
 import productRoutes from "./routes/products.js";
+import orderRoutes from "./routes/orders.js";
 import { apiLimiter } from "./middleware/rateLimiters.js";
 import { notFound, errorHandler } from "./middleware/errorHandler.js";
 
@@ -20,6 +21,7 @@ app.use(express.json());
 app.use("/api", apiLimiter); // general rate limit
 app.use("/api/auth", authRoutes);
 app.use("/api/products", productRoutes);
+app.use("/api/orders", orderRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

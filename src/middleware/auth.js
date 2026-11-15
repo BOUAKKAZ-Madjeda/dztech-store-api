@@ -1,5 +1,7 @@
 import jwt from "jsonwebtoken";
 import { createRemoteJWKSet, jwtVerify } from "jose";
+import User from "../models/User.js";
+import { isSellerEmail } from "../utils/roles.js";
 
 let jwks;
 const oauthEnabled = () =>
@@ -15,7 +17,7 @@ async function verifyOAuth(token) {
 }
 
 /**
- * Protects a route. Accepts:
+ * Authentication. Accepts:
  *  1) the local JWT returned by POST /api/auth/login
  *  2) an OAuth 2.0 / OIDC access token (if OAUTH_* env vars are set)
  * Expected header: Authorization: Bearer <token>
@@ -37,7 +39,14 @@ export async function protect(req, res, next) {
   if (oauthEnabled()) {
     try {
       const payload = await verifyOAuth(token);
-      req.user = { id: payload.sub, email: payload.email, provider: "oauth2" };
+      // Machine-to-machine tokens (client credentials) or listed seller emails count as sellers
+      const isSeller = payload.gty === "client-credentials" || isSellerEmail(payload.email);
+      req.user = {
+        id: payload.sub,
+        email: payload.email,
+        provider: "oauth2",
+        role: isSeller ? "seller" : "customer",
+      };
       return next();
     } catch {
       /* fall through */
@@ -45,4 +54,25 @@ export async function protect(req, res, next) {
   }
 
   return res.status(401).json({ message: "Invalid or expired token" });
+}
+
+// Only accounts created through /api/auth (customers and sellers)
+export function requireLocalUser(req, res, next) {
+  if (req.user?.provider === "local") return next();
+  return res.status(403).json({ message: "A customer account is required" });
+}
+
+// Seller-only routes (role is read from the database for local accounts)
+export async function requireSeller(req, res, next) {
+  try {
+    if (req.user?.provider === "oauth2") {
+      if (req.user.role === "seller") return next();
+      return res.status(403).json({ message: "Seller access required" });
+    }
+    const user = await User.findById(req.user.id).select("role");
+    if (user?.role === "seller") return next();
+    return res.status(403).json({ message: "Seller access required" });
+  } catch (err) {
+    return next(err);
+  }
 }

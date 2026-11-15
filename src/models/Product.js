@@ -15,7 +15,7 @@ const productSchema = new mongoose.Schema(
     badge: { type: String, trim: true, default: "" }, // used by the React UI
   },
   {
-    timestamps: true,
+    timestamps: true, // timestamps option adds createdAt and updatedAt fields to the schema
     toJSON: {
       // Return `id` instead of `_id` so the React cart (item.id) works unchanged
       transform: (_doc, ret) => {
